@@ -4,7 +4,7 @@
 
 ## 我的爪子 (myclaw) · 入门与启动
 
-本仓库源自 **[claw0](https://github.com/shareAI-lab/claw0)** 教学路线：演示如何从最简单的 Agent 循环走向网关与 Intelligence。**当前剪裁版本**以 **`s06_intelligence.py`（仓库根目录）** + **`workspace/`** 中的分层提示词（Soul / Tools / Memory 等）+ **`web/`** React 前端与 FastAPI 后端为主，便于本地运行对话界面。
+未知
 
 ---
 
