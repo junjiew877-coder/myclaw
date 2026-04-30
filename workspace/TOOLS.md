@@ -1,6 +1,6 @@
 # 工具说明
 
-本节描述在运行 **`zh/s06_intelligence.py`（Intelligence + Sessions）** 时，模型可用的 **LLM 工具**。所有**文件类**路径均相对于工作区根目录 **`workspace/`**，且不能穿越到其外。
+本节描述在运行 **`s06_intelligence.py`（仓库根目录，Intelligence + Sessions）** 时，模型可用的 **LLM 工具**。所有**文件类**路径均相对于工作区根目录 **`workspace/`**，且不能穿越到其外。
 
 ## 工具一览（9 个）
 

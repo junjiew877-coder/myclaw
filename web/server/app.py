@@ -21,9 +21,6 @@ from fastapi.responses import StreamingResponse
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-ZH = ROOT / "sessions" / "zh"
-if str(ZH) not in sys.path:
-    sys.path.insert(0, str(ZH))
 
 import s06_intelligence as s06  # noqa: E402
 

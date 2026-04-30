@@ -1,177 +1,130 @@
-[English](README.md) | [中文](README.zh.md) | [日本語](README.ja.md)  
-# claw0
-
-
-**From Zero to One: Build an AI Agent Gateway**
-
-> 10 progressive sections -- every section is a single, runnable Python file.
-> 3 languages (English, Chinese, Japanese) -- code + docs co-located.
+[简体中文](#我的爪子-myclaw-入门与启动) · Extended curriculum · [README.zh.md](README.zh.md)
 
 ---
 
-## What is this?
+## 我的爪子 (myclaw) · 入门与启动
 
-Most agent tutorials stop at "call an API once." This repository starts from that while loop and takes you all the way to a production-grade gateway.
+本仓库源自 **[claw0](https://github.com/shareAI-lab/claw0)** 教学路线：演示如何从最简单的 Agent 循环走向网关与 Intelligence。**当前剪裁版本**以 **`s06_intelligence.py`（仓库根目录）** + **`workspace/`** 中的分层提示词（Soul / Tools / Memory 等）+ **`web/`** React 前端与 FastAPI 后端为主，便于本地运行对话界面。
 
-Build a minimal AI agent gateway from scratch, section by section. 10 sections, 10 core concepts, ~7,000 lines of Python. Each section introduces exactly one new idea while keeping all prior code intact. After all 10, you can read OpenClaw's production codebase with confidence.
+---
 
-```sh
-s01: Agent Loop           -- The foundation: while + stop_reason
-s02: Tool Use             -- Let the model call tools: dispatch table
-s03: Sessions & Context   -- Persist conversations, handle overflow
-s04: Channels             -- Telegram + Feishu: real channel pipelines
-s05: Gateway & Routing    -- 5-tier binding, session isolation
-s06: Intelligence         -- Soul, memory, skills, prompt assembly
-s07: Heartbeat & Cron     -- Proactive agent + scheduled tasks
-s08: Delivery             -- Reliable message queue with backoff
-s09: Resilience           -- 3-layer retry onion + auth profile rotation
-s10: Concurrency          -- Named lanes serialize the chaos
-```
+### 仓库里大致有什么｜What’s inside
 
-## Architecture
+| 路径 | 说明 |
+|------|------|
+| `s06_intelligence.py` | **第六节 Intelligence**：会话、`BootstrapLoader`、工具调用、记忆检索等 REPL / 逻辑入口（请在仓库根目录运行）。 |
+| `workspace/` | 示例「工作区」：`SOUL.md`、`TOOLS.md`、`MEMORY.md`、`.sessions/` 等；运行时读写相对于该目录。 |
+| `web/` | Web UI：`web/server/` FastAPI + SSE，`web/src/` Vite + React；开发时通过 Vite 将 `/api` 代理到后端。 |
+| `.env.example` | **配置模板**（可提交到 Git）；复制为 `.env` 后填入密钥（`.env` 勿提交）。 |
+| `requirements.txt` | Python 依赖。 |
+| [README.zh.md](README.zh.md) | 完整 claw0 **课程体系与章节一览**（与本剪裁仓库的文件布局不一定完全一致）。 |
 
-```
-+------------------- claw0 layers -------------------+
-|                                                     |
-|  s10: Concurrency  (named lanes, generation track)  |
-|  s09: Resilience   (auth rotation, overflow compact)|
-|  s08: Delivery     (write-ahead queue, backoff)     |
-|  s07: Heartbeat    (lane lock, cron scheduler)      |
-|  s06: Intelligence (8-layer prompt, hybrid memory)  |
-|  s05: Gateway      (WebSocket, 5-tier routing)      |
-|  s04: Channels     (Telegram pipeline, Feishu hook) |
-|  s03: Sessions     (JSONL persistence, 3-stage retry)|
-|  s02: Tools        (dispatch table, 4 tools)        |
-|  s01: Agent Loop   (while True + stop_reason)       |
-|                                                     |
-+-----------------------------------------------------+
-```
+---
 
-## Section Dependencies
+### 配置：`.env.example` 与 `.env`（类比说明）
 
-```
-s01 --> s02 --> s03 --> s04 --> s05
-                 |               |
-                 v               v
-                s06 ----------> s07 --> s08
-                 |               |
-                 v               v
-                s09 ----------> s10
-```
+与多数开源项目一样：**仓库里只放不含密钥的示例**，本地密钥放在 **不入库** 的文件里。
 
-- s01-s02: Foundation (no dependencies)
-- s03: Builds on s02 (adds persistence to the tool loop)
-- s04: Builds on s03 (channels produce InboundMessages for sessions)
-- s05: Builds on s04 (routes channel messages to agents)
-- s06: Builds on s03 (uses sessions for context, adds prompt layers)
-- s07: Builds on s06 (heartbeat uses soul/memory for prompt)
-- s08: Builds on s07 (heartbeat output flows through delivery queue)
-- s09: Builds on s03+s06 (reuses ContextGuard for overflow, model config)
-- s10: Builds on s07 (replaces single Lock with named lane system)
+| 文件 | 是否提交 Git | 作用 |
+|------|----------------|------|
+| **`.env.example`** | ✅ 是 | 列出有哪些环境变量、占位格式与注释；新人克隆后对照填写。 |
+| **`.env`** | ❌ 否（应在 `.gitignore`） | 你的真实 `ANTHROPIC_API_KEY`、`MODEL_ID` 等；仅在本地或 CI 密钥管理中生效。 |
 
-## Quick Start
+典型步骤：
 
-```sh
-# 1. Clone and enter
-git clone https://github.com/shareAI-lab/claw0.git && cd claw0
-
-# 2. Install dependencies
-pip install -r requirements.txt
-
-# 3. Configure
+```bash
 cp .env.example .env
-# Edit .env: set ANTHROPIC_API_KEY and MODEL_ID
-
-# 4. Run any section (pick your language)
-python sessions/en/s01_agent_loop.py    # English
-python sessions/zh/s01_agent_loop.py    # Chinese
-python sessions/ja/s01_agent_loop.py    # Japanese
+# 编辑 .env：至少填写 ANTHROPIC_API_KEY；按需填写 MODEL_ID、SERPAPI_API_KEY 等
 ```
 
-## Learning Path
+后端启动时会读取环境变量（常与 `python-dotenv` 加载 `.env` 配合使用）。
 
-Each section adds exactly one new concept. All prior code stays intact:
+---
 
-```
-Phase 1: FOUNDATION     Phase 2: CONNECTIVITY     Phase 3: BRAIN        Phase 4: AUTONOMY       Phase 5: PRODUCTION
-+----------------+      +-------------------+     +-----------------+   +-----------------+   +-----------------+
-| s01: Loop      |      | s03: Sessions     |     | s06: Intelligence|  | s07: Heartbeat  |   | s09: Resilience |
-| s02: Tools     | ---> | s04: Channels     | --> |   soul, memory, | ->|   & Cron        |-->|   & Concurrency |
-|                |      | s05: Gateway      |     |   skills, prompt |  | s08: Delivery   |   | s10: Lanes      |
-+----------------+      +-------------------+     +-----------------+   +-----------------+   +-----------------+
- while + dispatch        persist + route            personality + recall  proactive + reliable  retry + serialize
-```
+### 环境与版本建议
 
-## Section Details
+- **Python**：建议 **3.10+**（README.zh 中写的是 3.11+；若使用 **3.9**，请确认代码含 `from __future__ import annotations`，否则会触发类型注解相关报错）。
+- **Node.js**：建议 **18+**（用于 `web/` 前端打包与开发服务器）。
+- **包管理**：Python 可用 **uv**、pip、pipenv 等；下文以 **uv** 为例。
 
-| # | Section | Core Concept | Lines |
-|---|---------|-------------|-------|
-| 01 | Agent Loop | `while True` + `stop_reason` -- that's an agent | ~175 |
-| 02 | Tool Use | Tools = schema dict + handler map. Model picks a name, you look it up | ~445 |
-| 03 | Sessions | JSONL: append on write, replay on read. Too big? Summarize old parts | ~890 |
-| 04 | Channels | Every platform differs, but they all produce the same `InboundMessage` | ~780 |
-| 05 | Gateway | Binding table maps (channel, peer) to agent. Most specific wins | ~625 |
-| 06 | Intelligence | System prompt = files on disk. Swap files, change personality | ~750 |
-| 07 | Heartbeat & Cron | Timer thread: "should I run?" + queue work alongside user messages | ~660 |
-| 08 | Delivery | Write to disk first, then send. Crashes can't lose messages | ~870 |
-| 09 | Resilience | 3-layer retry onion: auth rotation, overflow compaction, tool-use loop | ~1130 |
-| 10 | Concurrency | Named lanes with FIFO queues, generation tracking, Future-based results | ~900 |
+---
 
-## Repository Structure
+### 使用 uv：从虚拟环境到跑通前后端
 
-```
-claw0/
-  README.md              English README
-  README.zh.md           Chinese README
-  README.ja.md           Japanese README
-  .env.example           Configuration template
-  requirements.txt       Python dependencies
-  sessions/              All teaching sessions (code + docs)
-    en/                  English
-      s01_agent_loop.py  s01_agent_loop.md
-      s02_tool_use.py    s02_tool_use.md
-      ...                (10 .py + 10 .md)
-    zh/                  Chinese
-      s01_agent_loop.py  s01_agent_loop.md
-      ...                (10 .py + 10 .md)
-    ja/                  Japanese
-      s01_agent_loop.py  s01_agent_loop.md
-      ...                (10 .py + 10 .md)
-  workspace/             Shared workspace samples
-    SOUL.md  IDENTITY.md  TOOLS.md  USER.md
-    HEARTBEAT.md  BOOTSTRAP.md  AGENTS.md  MEMORY.md
-    CRON.json
-    skills/example-skill/SKILL.md
+在**仓库根目录**（与 `s06_intelligence.py`、`web/` 同级）执行。
+
+**1）创建并激活虚拟环境，安装依赖**
+
+```bash
+uv venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+uv pip install -r requirements.txt
 ```
 
-Each language folder is self-contained: runnable Python code + documentation side by side. Code logic is identical across languages; comments and docs differ.
+**2）配置环境变量**
 
-## Prerequisites
-
-- Python 3.11+
-- An API key for Anthropic (or compatible provider)
-
-## Dependencies
-
-```
-anthropic>=0.39.0
-python-dotenv>=1.0.0
-websockets>=12.0
-croniter>=2.0.0
-python-telegram-bot>=21.0
-httpx>=0.27.0
+```bash
+cp .env.example .env
+# 编辑 .env
 ```
 
-## Related Projects
+**3）终端 A：启动后端 API**
 
-- **[learn-claude-code](https://github.com/shareAI-lab/learn-claude-code)** -- A companion teaching repo that builds an agent **framework** (nano Claude Code) from scratch in 12 progressive sessions. Where claw0 focuses on gateway routing, channels, and proactive behavior, learn-claude-code dives deep into the agent's internal design: structured planning (TodoManager + nag), context compression (3-layer compact), file-based task persistence with dependency graphs, team coordination (JSONL mailboxes, shutdown/plan-approval FSM), autonomous self-organization, and git worktree isolation for parallel execution. If you want to understand how a production-grade unit agent works inside, start there.
+```bash
+uvicorn web.server.app:app --host 127.0.0.1 --port 8765
+```
 
-## About
-<img width="260" src="https://github.com/user-attachments/assets/fe8b852b-97da-4061-a467-9694906b5edf" /><br>
+**4）终端 B：安装前端依赖并启动开发服务器**
 
-Scan with Wechat to fellow us,  
-or fellow on X: [shareAI-Lab](https://x.com/baicai003)  
+```bash
+cd web
+npm install
+npm run dev
+```
 
-## License
+**5）浏览器**
 
-MIT
+开发模式下前端一般为 **http://127.0.0.1:5173**（见 `web/vite.config.ts`），并通过代理访问 **http://127.0.0.1:8765** 上的 `/api`。
+
+**6）（可选）仅终端 REPL，不用 Web**
+
+```bash
+# 仍在仓库根目录，且已激活 venv、已配置 .env
+python s06_intelligence.py
+```
+
+---
+
+### 常见问题
+
+- **后端报错缺少 `ANTHROPIC_API_KEY` 或找不到 `workspace/`**：检查 `.env` 与是否在**仓库根目录**启动。
+- **Python 3.9 与 `list[dict] | None` 报错**：升级到 3.10+，或确保源码中有 `from __future__ import annotations`（本仓库已针对该问题做过兼容处理）。
+- **端口占用**：修改 `uvicorn` 端口或 `web/vite.config.ts` 中的 `proxy.target`，并保持前后端一致。
+
+---
+
+### 开源仓库的 README 通常要写什么？（速查）
+
+便于他人 **一眼看懂、能跑起来、知道如何参与**，常见区块如下（不必一次写全，可按需迭代）：
+
+| 区块 | 作用 |
+|------|------|
+| **项目名称 + 一句话介绍** | 解决什么问题、面向谁。 |
+| **功能 / 截图 / Demo** | 可选；UI 项目尤其有用。 |
+| **快速开始（Quick Start）** | 克隆、依赖、配置、一条命令跑起来。 |
+| **环境变量** | 说明 `.env.example` → `.env`，列出必填项。 |
+| **目录结构** | 主要文件夹含义（见上文表格）。 |
+| **开发与构建** | 测试、lint、前后端启动命令。 |
+| **兼容性** | 语言版本、操作系统。 |
+| **许可证（License）** | 常见为 MIT / Apache-2.0；需在仓库里放 `LICENSE` 文件并与声明一致。 |
+| **贡献（Contributing）** | 可单独写 `CONTRIBUTING.md`：PR 流程、代码风格。 |
+| **链接** | 文档站点、讨论区、上游项目致谢。 |
+
+本仓库另提供一份 **带注释的占位模板**：[README.example.md](README.example.md)，可作为你以后新项目复制修改的起点（类似 `.env.example` 之于 `.env`：模板人人可复制，真实 README 随项目迭代）。
+
+---
+
+### 延伸阅读
+
+- 完整章节叙事与架构图：见 [README.zh.md](README.zh.md)。  
+- 模板示例：见 [README.example.md](README.example.md)。

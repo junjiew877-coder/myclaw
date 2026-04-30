@@ -1,4 +1,4 @@
-[English](README.md) | [中文](README.zh.md) | [日本語](README.ja.md)
+[入门与启动](README.md) | [本页·课程全文](README.zh.md)
 
 # claw0
 
@@ -86,6 +86,7 @@ cp .env.example .env
 python sessions/zh/s01_agent_loop.py    # 中文
 python sessions/en/s01_agent_loop.py    # English
 python sessions/ja/s01_agent_loop.py    # Japanese
+python s06_intelligence.py              # s06 Intelligence（本仓库在根目录）
 ```
 
 ## 学习路径
@@ -126,6 +127,7 @@ claw0/
   README.ja.md           Japanese README
   .env.example           配置模板
   requirements.txt       Python 依赖
+  s06_intelligence.py    s06 Intelligence 教学脚本 (本仓库位于根目录)
   sessions/              所有教学章节 (代码 + 文档)
     en/                  English
       s01_agent_loop.py  s01_agent_loop.md

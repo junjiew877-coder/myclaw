@@ -32,13 +32,14 @@ Section 06: Intelligence (智能)
         +-------------------------------+        +-------------------+
 
 用法:
-    cd claw0
-    python zh/s06_intelligence.py
+    （在仓库根目录）python s06_intelligence.py
 
 REPL 命令:
     会话与上下文: /new /list /switch /context /compact /help
     智能与记忆: /soul /skills /memory /search <q> /prompt /bootstrap
 """
+
+from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # 导入与配置
@@ -58,7 +59,7 @@ from typing import Any, Iterator
 from dotenv import load_dotenv
 from anthropic import Anthropic
 
-load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env", override=True)
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 MODEL_ID = os.getenv("MODEL_ID", "claude-sonnet-4-20250514")
 # Web UI：对话档 / 推理档（可选覆盖；默认回退到 MODEL_ID）
@@ -70,7 +71,7 @@ client = Anthropic(
     base_url=os.getenv("ANTHROPIC_BASE_URL") or None,
 )
 
-WORKSPACE_DIR = Path(__file__).resolve().parent.parent.parent / "workspace"
+WORKSPACE_DIR = Path(__file__).resolve().parent / "workspace"
 
 # Bootstrap 文件名 -- 每个 agent 启动时加载这 8 个文件
 BOOTSTRAP_FILES = [
@@ -2037,7 +2038,7 @@ def main() -> None:
         sys.exit(1)
     if not WORKSPACE_DIR.is_dir():
         print(f"{YELLOW}错误: 未找到工作区目录: {WORKSPACE_DIR}{RESET}")
-        print(f"{DIM}请从 claw0 项目根目录运行.{RESET}")
+        print(f"{DIM}请从本仓库根目录运行.{RESET}")
         sys.exit(1)
     agent_loop()
 
