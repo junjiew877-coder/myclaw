@@ -1,4 +1,4 @@
-r"""
+"""
 Section 06: Intelligence (智能)
 "赋予灵魂, 教会记忆"
 
