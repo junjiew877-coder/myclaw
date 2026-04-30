@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Environment
+.env
+
+# Sessions & runtime data
+workspace/.sessions/
+workspace/.agents/
+workspace/memory/
+workspace/cron/
+workspace/delivery-queue/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 忽略所有前端依赖包
+node_modules/
+web/node_modules/

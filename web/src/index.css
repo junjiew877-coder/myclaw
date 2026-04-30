@@ -1,0 +1,12 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  font-family: system-ui, "Segoe UI", Roboto, "PingFang SC", sans-serif;
+  background: #fafafa;
+  color: #111;
+}
