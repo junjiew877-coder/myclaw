@@ -6,16 +6,16 @@
 
 ## 技术特性（Technical features）
 
-- **分层 system prompt** — 按 Identity / Soul / Tools / Skills / Memory / Bootstrap / Runtime / Channel 等区块组装（`intelligence/prompt.py`），内容主要来自 `workspace/` 下 Markdown。
-- **Bootstrap 加载** — 读取 `SOUL.md`、`IDENTITY.md`、`TOOLS.md`、`MEMORY.md` 等，按单文件与总字数上限截断（`intelligence/bootstrap.py`）。
+- **分层 system prompt** — 按 Identity / Soul / Tools / Skills / Memory / Bootstrap 等部分组装（`intelligence/prompt.py`），内容主要来自 `workspace/` 下的 Markdown。提供 **full / minimal** 等模式（目前需在源码中选用；规划上主 agent 用 full、子 agent 用 minimal 以减少非必要 context）。
+- **Bootstrap 加载** — 读取 `SOUL.md`、`IDENTITY.md`、`TOOLS.md`、`MEMORY.md` 等作为「人格、工具规范、记忆写入约定」，按单文件与总字数上限截断（`intelligence/bootstrap.py`）。
 - **Agent 技能（Skills）** — 扫描 `workspace/skills/**/SKILL.md`，格式化后注入系统提示（`intelligence/skills.py`）。
-- **记忆（Memory）** — 每轮对话前自动召回相关记忆；提供长期笔记的读写与存储抽象（`intelligence/memory/`，含 `recall.py`、`store_memory.py`、`runtime_memory.py`）。
-- **会话（Sessions）** — 基于 JSONL 的 `SessionStore`，维护 Anthropic 风格的 `messages` 历史（`intelligence/session/`，含 `store_session.py`、`message_utils.py`）。
-- **工具调用** — 统一工具列表与派发；工作区文件/命令类工具、记忆类工具，以及可选 SerpApi 网页搜索（`intelligence/tools/`：`dispatch_tools.py`、`workspace_tools.py`、`memory_tools.py`）。
-- **模型路由** — 通过环境变量区分对话档与推理档模型（`MODEL_ID_CHAT` / `MODEL_ID_REASON`）；可选兼容 API 的 `ANTHROPIC_BASE_URL`（如 OpenRouter）（`intelligence/config.py`）。
-- **Web API** — FastAPI 通过 **Server-Sent Events** 推送事件：阶段（phase）、技能列表、工具预览、**来自 Anthropic `messages.stream` 的 `text_stream` 增量（映射为 `delta`）**、`turn_done` 等（`web/server/app.py`、`intelligence/runtime.py`）。
-- **终端 REPL** — `agent_loop` 驱动交互循环；对 LLM 调用使用 **ContextGuard** 做上下文溢出时的重试与压缩（`intelligence/loop.py`、`intelligence/context_guard.py`）；终端表现与辅助函数见 `intelligence/repl.py`、`intelligence/console.py`。
-- **统一 Python 入口** — 根目录 `myclaw_intelligence.py` 与包内 `intelligence/__init__.py` 导出 Web 与脚本常用的符号（如 `MyclawRuntime`、`iter_chat_turn`、`WORKSPACE_DIR`、`client`）。
+- **记忆（Memory）** — **存储**：`workspace/MEMORY.md` 为常驻笔记；按日落盘 **`workspace/memory/daily/YYYY-MM-DD.jsonl`**，每行一条 JSON（`ts`、`category`、`content`）（`intelligence/memory/store_memory.py`）。**自动召回**：`auto_recall` 对用户输入调用 **`hybrid_search(..., top_k=3)`**，结果写入系统提示（`intelligence/memory/recall.py`）。**检索**：纯 Python、无外部向量库 — 关键词支路为 **TF-IDF + 余弦相似度**；另一支路为基于 token **哈希的 64 维符号向量 + 余弦**；两路按权重合并（约 **0.7 / 0.3**），再对带日期的片段做**时间衰减**，并用 **MMR（Jaccard）** 去冗余（`MemoryStore.hybrid_search` 等）。
+- **会话（Sessions）与会话管理** — 每条对话有唯一 **`session_id`**，历史以 **JSONL** 落在工作区下的会话目录中，并带简单索引（标签、时间等）。**终端**可用 **`/list`**、**`/switch`**（后接目标 id）、**`/new`** 列出或切换会话。**Web** 为每个浏览器标签页生成 **`dialog_id`**（存在 `sessionStorage`），后端把 tab 映射到某条 **`session_id`**：提供列出、新建、按 id 选择、拉取历史等 REST 接口，侧栏点选即切换；发消息时带同一 **`dialog_id`**，在同一会话里续写。
+- **工具调用** — 统一工具列表与派发；工作区文件/命令类工具、记忆类工具；**网页搜索**为可选能力，需单独配置 **`SERPAPI_API_KEY`**（SerpAPI，见 `intelligence/tools/workspace_tools.py`、`workspace/TOOLS.md`）（`intelligence/tools/`：`dispatch_tools.py`、`workspace_tools.py`、`memory_tools.py`）。
+- **模型路由** — 支持：思考模式开启/关闭、思考/非思考模型切换，通过环境变量区分非思考与思考模型（`MODEL_ID_CHAT` / `MODEL_ID_REASON`）；
+- **流式传输（Web）** — 聊天接口通过 **SSE** 推送事件；助手正文使用 Anthropic **`messages.stream`** 的 **`text_stream`**，将增量映射为 **`type: "delta"`**（`intelligence/runtime.py`、`web/server/app.py`）。终端 REPL 仍以 **`messages.create`** 非流式为主（`intelligence/loop.py`）。
+- **上下文压缩与溢出保护** — **`ContextGuard`**（`intelligence/context_guard.py`）：以 **字符数 ÷ 4** 粗估 token；**`guard_api_call`** 在溢出时先**截断过大工具返回**，仍失败则 **`compact_history`**（将较早部分消息序列化后，再调 **`messages.create`** 生成摘要并折叠进历史）。终端可 **`/context`** 查看估算用量、**`/compact`** 手动压缩（`intelligence/repl.py`）。
+- **终端斜杠命令** — 以 **`/`** 开头的输入在 **`intelligence/repl.py`** 中处理，不进入模型对话。含：**会话** `/new`、`/list`、`/switch`、`/context`、`/compact`；**调试/检视** `/help`、`/soul`、`/skills`、`/memory`、`/search <q>`、`/prompt`、`/bootstrap`（启动提示见 `intelligence/loop.py`）。
 
 ---
 
