@@ -1,12 +1,12 @@
 # 工具说明
 
-本节描述在运行 **`s06_intelligence.py`（仓库根目录，Intelligence + Sessions）** 时，模型可用的 **LLM 工具**。所有**文件类**路径均相对于工作区根目录 **`workspace/`**，且不能穿越到其外。
+本节描述在运行 **`myclaw_intelligence.py`（仓库根目录，Intelligence + Sessions）** 时，模型可用的 **LLM 工具**。所有**文件类**路径均相对于工作区根目录 **`workspace/`**，且不能穿越到其外。
 
 ## 工具一览（9 个）
 
 ### Shell
 
-- **bash**：执行 shell 命令并返回标准输出/错误。工作目录固定为 **`workspace/`** 根（不是项目根 `claw0`）。带简单危险命令拒绝与时间限制。
+- **bash**：执行 shell 命令并返回标准输出/错误。工作目录固定为 **`workspace/`** 根（不是仓库根目录）。带简单危险命令拒绝与时间限制。
 
 ### 文件
 

@@ -1,208 +1,18 @@
+/**
+ * 应用根组件：会话侧栏、聊天区、模型档位与流式发送逻辑。
+ * UI 子组件与类型、API、存储工具拆分到 src/components、types、api、lib。
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { streamChat } from "./api/chat";
+import { AssistantMarkdown } from "./components/AssistantMarkdown";
+import { GrayCollapsible } from "./components/GrayCollapsible";
+import { IconSidebarLayout } from "./components/IconSidebarLayout";
+import { SIDEBAR_OPEN_KEY } from "./constants";
+import { normalizeHydratedMessages } from "./lib/messages";
+import { loadDialogId, loadSidebarOpen } from "./lib/sessionDialog";
+import type { AssistantBlock, ChatMessage, SessionItem } from "./types";
 import "./App.css";
-
-/** 与参考 web 样式一致：灰色折叠面板 */
-function GrayCollapsible({
-  summaryLabel,
-  body,
-  variant = "default",
-}: {
-  summaryLabel: string;
-  body: string;
-  variant?: "default" | "tool" | "result";
-}) {
-  const [open, setOpen] = useState(false);
-  const text = body ?? "";
-  const panelClass =
-    variant === "tool"
-      ? "aux-grey-panel aux-panel-tool"
-      : variant === "result"
-        ? "aux-grey-panel aux-panel-result"
-        : "aux-grey-panel";
-
-  return (
-    <div className={panelClass}>
-      <button
-        type="button"
-        className="aux-grey-panel-head"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="aux-grey-panel-title">{summaryLabel}</span>
-        <span className="aux-grey-chev" aria-hidden>
-          {open ? " ∨" : " >"}
-        </span>
-      </button>
-      <div className={`aux-grey-panel-body ${open ? "is-open" : "is-collapsed"}`}>
-        <pre className="aux-grey-pre">{text.length ? text : " "}</pre>
-      </div>
-    </div>
-  );
-}
-
-function AssistantMarkdown({ text }: { text: string }) {
-  return (
-    <div className="assistant-md">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
-    </div>
-  );
-}
-
-type AssistantBlock =
-  | { kind: "reasoning"; text: string }
-  | { kind: "tool"; toolName: string; preview: string }
-  | { kind: "tool_result"; toolName: string; preview: string }
-  | { kind: "text"; text: string };
-
-type ChatMessage =
-  | { role: "user"; content: string }
-  | { role: "assistant"; blocks: AssistantBlock[] };
-
-type SessionItem = {
-  id: string;
-  label: string;
-  /** 由服务端从会话开头若干句生成的短标题 */
-  title?: string;
-  last_active: string;
-  message_count: number;
-};
-
-const DIALOG_KEY = "claw0_s06_dialog_id";
-const SIDEBAR_OPEN_KEY = "claw0_sidebar_open";
-
-function loadDialogId(): string {
-  try {
-    let id = sessionStorage.getItem(DIALOG_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      sessionStorage.setItem(DIALOG_KEY, id);
-    }
-    return id;
-  } catch {
-    return "web_session";
-  }
-}
-
-function loadSidebarOpen(): boolean {
-  try {
-    return sessionStorage.getItem(SIDEBAR_OPEN_KEY) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-/** 侧栏开关：左侧分栏示意（与常见产品一致） */
-function IconSidebarLayout() {
-  return (
-    <svg
-      className="sidebar-toggle-icon"
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      aria-hidden
-    >
-      <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-      <line x1="9" y1="4" x2="9" y2="20" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-async function streamChat(
-  payload: {
-    text: string;
-    model: "chat" | "reason";
-    dialog_id: string;
-  },
-  onEvent: (ev: Record<string, unknown>) => void,
-): Promise<void> {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok || !res.body) {
-    throw new Error(`HTTP ${res.status}`);
-  }
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n");
-    buf = lines.pop() ?? "";
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (!raw) continue;
-      try {
-        const ev = JSON.parse(raw) as Record<string, unknown>;
-        onEvent(ev);
-      } catch {
-        /* partial chunk */
-      }
-    }
-  }
-  if (buf.startsWith("data: ")) {
-    const raw = buf.slice(6).trim();
-    if (raw) {
-      try {
-        onEvent(JSON.parse(raw) as Record<string, unknown>);
-      } catch {
-        /* */
-      }
-    }
-  }
-}
-
-function parseAssistantBlocks(raw: unknown): AssistantBlock[] {
-  if (!Array.isArray(raw)) return [];
-  const out: AssistantBlock[] = [];
-  for (const b of raw) {
-    if (!b || typeof b !== "object") continue;
-    const o = b as Record<string, unknown>;
-    const kind = o.kind;
-    if (kind === "text" && typeof o.text === "string") {
-      out.push({ kind: "text", text: o.text });
-    } else if (kind === "reasoning" && typeof o.text === "string") {
-      out.push({ kind: "reasoning", text: o.text });
-    } else if (kind === "tool" && typeof o.toolName === "string") {
-      out.push({
-        kind: "tool",
-        toolName: o.toolName,
-        preview: typeof o.preview === "string" ? o.preview : "",
-      });
-    } else if (kind === "tool_result" && typeof o.toolName === "string") {
-      out.push({
-        kind: "tool_result",
-        toolName: o.toolName,
-        preview: typeof o.preview === "string" ? o.preview : "",
-      });
-    }
-  }
-  return out;
-}
-
-function normalizeHydratedMessages(raw: unknown): ChatMessage[] {
-  if (!Array.isArray(raw)) return [];
-  const out: ChatMessage[] = [];
-  for (const m of raw) {
-    if (!m || typeof m !== "object") continue;
-    const o = m as Record<string, unknown>;
-    if (o.role === "user" && typeof o.content === "string") {
-      out.push({ role: "user", content: o.content });
-    } else if (o.role === "assistant" && o.blocks) {
-      out.push({
-        role: "assistant",
-        blocks: parseAssistantBlocks(o.blocks),
-      });
-    }
-  }
-  return out;
-}
 
 export function App() {
   const [input, setInput] = useState("");
@@ -413,7 +223,9 @@ export function App() {
             const p = ev.phase as string;
             const labels: Record<string, string> = {
               recall_start: "检索记忆中…",
-              recall_done: ev.has_memory ? "已注入相关记忆" : "无自动召回记忆",
+              recall_done: ev["has_memory"]
+                ? "已注入相关记忆"
+                : "无自动召回记忆",
               prompt_ready: "系统提示已组装",
               llm_call: "调用模型…",
               tool_round_done: "工具回合完成，继续推理",
@@ -494,31 +306,31 @@ export function App() {
             </button>
           </div>
           <div className="session-list">
-          {!sessionReady && <p className="session-sidebar-hint">加载中…</p>}
-          {sessionReady &&
-            sessions.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`session-item ${s.id === currentSessionId ? "is-active" : ""}`}
-                disabled={sessionBusy || loading}
-                onClick={() => void switchSession(s.id)}
-              >
-                <span
-                  className="session-item-label"
-                  title={
-                    s.last_active
-                      ? `最近活动 ${new Date(s.last_active).toLocaleString()}`
-                      : undefined
-                  }
+            {!sessionReady && <p className="session-sidebar-hint">加载中…</p>}
+            {sessionReady &&
+              sessions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`session-item ${s.id === currentSessionId ? "is-active" : ""}`}
+                  disabled={sessionBusy || loading}
+                  onClick={() => void switchSession(s.id)}
                 >
-                  {s.title?.trim() || s.label || "对话"}
-                </span>
-                <span className="session-item-meta">
-                  {s.message_count > 0 ? `${s.message_count} 条消息` : "尚无消息"}
-                </span>
-              </button>
-            ))}
+                  <span
+                    className="session-item-label"
+                    title={
+                      s.last_active
+                        ? `最近活动 ${new Date(s.last_active).toLocaleString()}`
+                        : undefined
+                    }
+                  >
+                    {s.title?.trim() || s.label || "对话"}
+                  </span>
+                  <span className="session-item-meta">
+                    {s.message_count > 0 ? `${s.message_count} 条消息` : "尚无消息"}
+                  </span>
+                </button>
+              ))}
           </div>
         </aside>
       </div>

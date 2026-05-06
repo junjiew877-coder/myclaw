@@ -1,5 +1,5 @@
 """
-FastAPI + SSE：为 s06_intelligence Web UI 提供 /api/chat。
+FastAPI + SSE：为 myclaw Web UI 提供 /api/chat。
 启动（仓库根目录）:
   uvicorn web.server.app:app --host 127.0.0.1 --port 8765
 前端（另一终端）:
@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import s06_intelligence as s06  # noqa: E402
+import myclaw_intelligence as myclaw  # noqa: E402
 
-_runtime: s06.S06Runtime | None = None
+_runtime: myclaw.MyclawRuntime | None = None
 # dialog_id（浏览器 tab） -> SessionStore 里的 session_id
 _DIALOG_TO_SESSION: dict[str, str] = {}
 
@@ -33,15 +33,15 @@ _DIALOG_TO_SESSION: dict[str, str] = {}
 async def lifespan(_app: FastAPI):
     global _runtime
     if not os.getenv("ANTHROPIC_API_KEY"):
-        raise RuntimeError("缺少 ANTHROPIC_API_KEY，请在 claw0/.env 中配置")
-    if not s06.WORKSPACE_DIR.is_dir():
-        raise RuntimeError(f"未找到工作区: {s06.WORKSPACE_DIR}")
-    _runtime = s06.S06Runtime(session_agent_id="claw0-web")
+        raise RuntimeError("缺少 ANTHROPIC_API_KEY，请在仓库根目录 .env 中配置")
+    if not myclaw.WORKSPACE_DIR.is_dir():
+        raise RuntimeError(f"未找到工作区: {myclaw.WORKSPACE_DIR}")
+    _runtime = myclaw.MyclawRuntime(session_agent_id="myclaw-web")
     yield
     _runtime = None
 
 
-app = FastAPI(title="claw0 s06 Web", lifespan=lifespan)
+app = FastAPI(title="myclaw Web API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -144,12 +144,12 @@ def _assistant_content_to_ui_blocks(
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "model_chat": s06.MODEL_ID_CHAT, "model_reason": s06.MODEL_ID_REASON}
+    return {"ok": True, "model_chat": myclaw.MODEL_ID_CHAT, "model_reason": myclaw.MODEL_ID_REASON}
 
 
 @app.get("/api/sessions")
 def list_sessions_api(dialog_id: str = "default") -> dict:
-    """列出 claw0-web 下的会话；dialog_id 用于返回当前 tab 绑定的 session。"""
+    """列出 myclaw-web 下的会话；dialog_id 用于返回当前 tab 绑定的 session。"""
     rt = _runtime
     if rt is None:
         raise HTTPException(503, "server not ready")
@@ -217,7 +217,7 @@ def session_messages_api(session_id: str) -> dict:
 def chat(body: dict) -> StreamingResponse:
     text = (body.get("text") or "").strip()
     dialog_id = (body.get("dialog_id") or "default").strip() or "default"
-    # 与旧版 RayClaw 一致：body.model 为字符串；s06 使用 chat | reason
+    # body.model 为字符串：chat | reason
     model_mode = (body.get("model") or "chat").strip().lower()
     if model_mode not in ("chat", "reason"):
         model_mode = "chat"
@@ -240,10 +240,10 @@ def chat(body: dict) -> StreamingResponse:
         _DIALOG_TO_SESSION[dialog_id] = sid
     session_id = _DIALOG_TO_SESSION[dialog_id]
 
-    model_id = s06.resolve_model_id(model_mode)
+    model_id = myclaw.resolve_model_id(model_mode)
 
     def gen():
-        for ev in s06.iter_s06_turn(
+        for ev in myclaw.iter_chat_turn(
             user_input=text,
             session_id=session_id,
             model_id=model_id,

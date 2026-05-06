@@ -1,80 +1,62 @@
-[简体中文](#我的爪子-myclaw-入门与启动) · Extended curriculum · [README.zh.md](README.zh.md)
+# myclaw
+
+面向个人的 AI 助手栈：**工作区 Markdown 驱动提示词**、**Anthropic 工具调用**、**记忆与会话持久化**，以及基于 **React + FastAPI**、通过 **SSE 真流式**输出正文的聊天界面。
 
 ---
 
-## 我的爪子 (myclaw) · 入门与启动
+## 技术特性（Technical features）
 
-未知
+- **分层 system prompt** — 按 Identity / Soul / Tools / Skills / Memory / Bootstrap / Runtime / Channel 等区块组装（`intelligence/prompt.py`），内容主要来自 `workspace/` 下 Markdown。
+- **Bootstrap 加载** — 读取 `SOUL.md`、`IDENTITY.md`、`TOOLS.md`、`MEMORY.md` 等，按单文件与总字数上限截断（`intelligence/bootstrap.py`）。
+- **Agent 技能（Skills）** — 扫描 `workspace/skills/**/SKILL.md`，格式化后注入系统提示（`intelligence/skills.py`）。
+- **记忆（Memory）** — 每轮对话前自动召回相关记忆；提供长期笔记的读写与存储抽象（`intelligence/memory/`，含 `recall.py`、`store_memory.py`、`runtime_memory.py`）。
+- **会话（Sessions）** — 基于 JSONL 的 `SessionStore`，维护 Anthropic 风格的 `messages` 历史（`intelligence/session/`，含 `store_session.py`、`message_utils.py`）。
+- **工具调用** — 统一工具列表与派发；工作区文件/命令类工具、记忆类工具，以及可选 SerpApi 网页搜索（`intelligence/tools/`：`dispatch_tools.py`、`workspace_tools.py`、`memory_tools.py`）。
+- **模型路由** — 通过环境变量区分对话档与推理档模型（`MODEL_ID_CHAT` / `MODEL_ID_REASON`）；可选兼容 API 的 `ANTHROPIC_BASE_URL`（如 OpenRouter）（`intelligence/config.py`）。
+- **Web API** — FastAPI 通过 **Server-Sent Events** 推送事件：阶段（phase）、技能列表、工具预览、**来自 Anthropic `messages.stream` 的 `text_stream` 增量（映射为 `delta`）**、`turn_done` 等（`web/server/app.py`、`intelligence/runtime.py`）。
+- **终端 REPL** — `agent_loop` 驱动交互循环；对 LLM 调用使用 **ContextGuard** 做上下文溢出时的重试与压缩（`intelligence/loop.py`、`intelligence/context_guard.py`）；终端表现与辅助函数见 `intelligence/repl.py`、`intelligence/console.py`。
+- **统一 Python 入口** — 根目录 `myclaw_intelligence.py` 与包内 `intelligence/__init__.py` 导出 Web 与脚本常用的符号（如 `MyclawRuntime`、`iter_chat_turn`、`WORKSPACE_DIR`、`client`）。
 
 ---
 
-### 仓库里大致有什么｜What’s inside
+## 环境要求（Requirements）
 
-| 路径 | 说明 |
+| 组件 | 说明 |
 |------|------|
-| `s06_intelligence.py` | **第六节 Intelligence**：会话、`BootstrapLoader`、工具调用、记忆检索等 REPL / 逻辑入口（请在仓库根目录运行）。 |
-| `workspace/` | 示例「工作区」：`SOUL.md`、`TOOLS.md`、`MEMORY.md`、`.sessions/` 等；运行时读写相对于该目录。 |
-| `web/` | Web UI：`web/server/` FastAPI + SSE，`web/src/` Vite + React；开发时通过 Vite 将 `/api` 代理到后端。 |
-| `.env.example` | **配置模板**（可提交到 Git）；复制为 `.env` 后填入密钥（`.env` 勿提交）。 |
-| `requirements.txt` | Python 依赖。 |
-| [README.zh.md](README.zh.md) | 完整 claw0 **课程体系与章节一览**（与本剪裁仓库的文件布局不一定完全一致）。 |
+| **Python** | 建议 3.10+（若与仓库内其他文档对齐，可用 3.11+） |
+| **Node.js** | 当前 LTS，仅用于 `web/` 前端开发与构建 |
+| **API** | `ANTHROPIC_API_KEY`（Anthropic 或兼容的 API 服务商） |
+
+Python 依赖见 `requirements.txt`（Anthropic SDK、FastAPI、Uvicorn、httpx、python-dotenv 等；另含可选的 Telegram、cron、搜索等库）。前端为 React 19 + Vite 6（见 `web/package.json`）。
 
 ---
 
-### 配置：`.env.example` 与 `.env`（类比说明）
+## 快速开始（Quick start）
 
-与多数开源项目一样：**仓库里只放不含密钥的示例**，本地密钥放在 **不入库** 的文件里。
+均在**仓库根目录**执行（与 `myclaw_intelligence.py`、`workspace/` 同级）。
 
-| 文件 | 是否提交 Git | 作用 |
-|------|----------------|------|
-| **`.env.example`** | ✅ 是 | 列出有哪些环境变量、占位格式与注释；新人克隆后对照填写。 |
-| **`.env`** | ❌ 否（应在 `.gitignore`） | 你的真实 `ANTHROPIC_API_KEY`、`MODEL_ID` 等；仅在本地或 CI 密钥管理中生效。 |
-
-典型步骤：
+### 1. 环境变量
 
 ```bash
 cp .env.example .env
-# 编辑 .env：至少填写 ANTHROPIC_API_KEY；按需填写 MODEL_ID、SERPAPI_API_KEY 等
+# 编辑 .env：至少配置 ANTHROPIC_API_KEY、MODEL_ID；其余见 .env.example
 ```
 
-后端启动时会读取环境变量（常与 `python-dotenv` 加载 `.env` 配合使用）。
+确保存在可用的 `workspace/` 目录（仓库内已带示例树）。
 
----
-
-### 环境与版本建议
-
-- **Python**：建议 **3.10+**（README.zh 中写的是 3.11+；若使用 **3.9**，请确认代码含 `from __future__ import annotations`，否则会触发类型注解相关报错）。
-- **Node.js**：建议 **18+**（用于 `web/` 前端打包与开发服务器）。
-- **包管理**：Python 可用 **uv**、pip、pipenv 等；下文以 **uv** 为例。
-
----
-
-### 使用 uv：从虚拟环境到跑通前后端
-
-在**仓库根目录**（与 `s06_intelligence.py`、`web/` 同级）执行。
-
-**1）创建并激活虚拟环境，安装依赖**
+### 2. Python 后端（API）
 
 ```bash
-uv venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-uv pip install -r requirements.txt
-```
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 
-**2）配置环境变量**
-
-```bash
-cp .env.example .env
-# 编辑 .env
-```
-
-**3）终端 A：启动后端 API**
-
-```bash
 uvicorn web.server.app:app --host 127.0.0.1 --port 8765
 ```
 
-**4）终端 B：安装前端依赖并启动开发服务器**
+### 3. Web 前端（开发模式）
+
+另开终端：
 
 ```bash
 cd web
@@ -82,49 +64,48 @@ npm install
 npm run dev
 ```
 
-**5）浏览器**
+- 开发服务器：**http://127.0.0.1:5173**
+- `/api` 会代理到 **http://127.0.0.1:8765**（`web/vite.config.ts`）
 
-开发模式下前端一般为 **http://127.0.0.1:5173**（见 `web/vite.config.ts`），并通过代理访问 **http://127.0.0.1:8765** 上的 `/api`。
-
-**6）（可选）仅终端 REPL，不用 Web**
+### 4. 仅终端 REPL（不用浏览器）
 
 ```bash
-# 仍在仓库根目录，且已激活 venv、已配置 .env
-python s06_intelligence.py
+python -m intelligence
+# 或：python -m intelligence.entrypoints.main
+# 或：python myclaw_intelligence.py
 ```
 
----
-
-### 常见问题
-
-- **后端报错缺少 `ANTHROPIC_API_KEY` 或找不到 `workspace/`**：检查 `.env` 与是否在**仓库根目录**启动。
-- **Python 3.9 与 `list[dict] | None` 报错**：升级到 3.10+，或确保源码中有 `from __future__ import annotations`（本仓库已针对该问题做过兼容处理）。
-- **端口占用**：修改 `uvicorn` 端口或 `web/vite.config.ts` 中的 `proxy.target`，并保持前后端一致。
+同样需要配置好的 `.env` 与 `workspace/`。
 
 ---
 
-### 开源仓库的 README 通常要写什么？（速查）
+## 项目结构（Project layout）
 
-便于他人 **一眼看懂、能跑起来、知道如何参与**，常见区块如下（不必一次写全，可按需迭代）：
-
-| 区块 | 作用 |
+| 路径 | 作用 |
 |------|------|
-| **项目名称 + 一句话介绍** | 解决什么问题、面向谁。 |
-| **功能 / 截图 / Demo** | 可选；UI 项目尤其有用。 |
-| **快速开始（Quick Start）** | 克隆、依赖、配置、一条命令跑起来。 |
-| **环境变量** | 说明 `.env.example` → `.env`，列出必填项。 |
-| **目录结构** | 主要文件夹含义（见上文表格）。 |
-| **开发与构建** | 测试、lint、前后端启动命令。 |
-| **兼容性** | 语言版本、操作系统。 |
-| **许可证（License）** | 常见为 MIT / Apache-2.0；需在仓库里放 `LICENSE` 文件并与声明一致。 |
-| **贡献（Contributing）** | 可单独写 `CONTRIBUTING.md`：PR 流程、代码风格。 |
-| **链接** | 文档站点、讨论区、上游项目致谢。 |
-
-本仓库另提供一份 **带注释的占位模板**：[README.example.md](README.example.md)，可作为你以后新项目复制修改的起点（类似 `.env.example` 之于 `.env`：模板人人可复制，真实 README 随项目迭代）。
+| `myclaw_intelligence.py` | 根目录稳定导入入口：供 FastAPI 等引用 `WORKSPACE_DIR`、`MyclawRuntime`、`iter_chat_turn` 等。 |
+| `requirements.txt` | Python 依赖列表。 |
+| `.env.example` | 环境变量说明模板。 |
+| **`intelligence/`** | **智能体核心包**。 |
+| `intelligence/__init__.py` | 包级导出（配置、运行时、流式生成器等）。 |
+| `intelligence/__main__.py` | 支持 `python -m intelligence`。 |
+| `intelligence/config.py` | 环境变量、`Anthropic` 客户端、`WORKSPACE_DIR`、模型 ID、各类长度上限。 |
+| `intelligence/runtime.py` | **`MyclawRuntime`**（与 CLI 启动段对齐的加载状态）、**`iter_chat_turn`**（单轮流式事件，供 SSE 使用）。 |
+| `intelligence/prompt.py` | **`build_system_prompt`**：多层 system prompt 组装。 |
+| `intelligence/bootstrap.py` | **`BootstrapLoader`**：工作区 Markdown 加载与截断策略。 |
+| `intelligence/skills.py` | **`SkillsManager`**：发现与格式化 `SKILL.md`。 |
+| `intelligence/context_guard.py` | **`ContextGuard`**：上下文过长时的 API 调用保护与历史压缩重试。 |
+| `intelligence/loop.py` | **`agent_loop`**：终端主循环（工具轮次、与 Guard 配合的 LLM 调用）。 |
+| `intelligence/repl.py` | 终端 REPL 的读写与交互辅助。 |
+| `intelligence/console.py` | 终端 ANSI 颜色等输出辅助。 |
+| `intelligence/entrypoints/main.py` | CLI 入口：检查密钥与工作区后进入 `agent_loop`。 |
+| `intelligence/memory/` | 记忆召回、存储与运行时注入（`recall.py`、`store_memory.py`、`runtime_memory.py`）。 |
+| `intelligence/session/` | 会话 JSONL 存储与消息工具（`store_session.py`、`message_utils.py`）。 |
+| `intelligence/tools/` | 工具定义与派发（`__init__.py`、`dispatch_tools.py`、`workspace_tools.py`、`memory_tools.py`）。 |
+| **`web/`** | **Web 前后端**。 |
+| `web/server/app.py` | FastAPI 应用：**`/api/chat` SSE**、会话与 dialog 映射、消息水合逻辑。 |
+| `web/vite.config.ts` | Vite 开发服务器与 `/api` 代理。 |
+| `web/src/` | React 源码：`api/chat.ts`（SSE 解析）、`App.tsx`、Markdown 与布局组件、`lib/` 消息与会话辅助等。 |
+| **`workspace/`** | **智能体可读写的「工作区」**：人格与工具说明 Markdown、`skills/` 技能目录、可选 `CRON.json` 等；路径约束由工具层保证不越界。 |
 
 ---
-
-### 延伸阅读
-
-- 完整章节叙事与架构图：见 [README.zh.md](README.zh.md)。  
-- 模板示例：见 [README.example.md](README.example.md)。

@@ -1,3 +1,7 @@
+/**
+ * 前端入口：挂载 React 根组件到 index.html 的 #root，并加载全局样式。
+ */
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";

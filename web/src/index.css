@@ -1,3 +1,7 @@
+/**
+ * 全局基础样式：盒模型、页面高度与字体，作用于 html/body/#root。
+ */
+
 * {
   box-sizing: border-box;
 }
